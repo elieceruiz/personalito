@@ -35,7 +35,7 @@ if domain_aut:
         if nombre_aut:
             col_autorizadores.insert_one({"domain_id": domain_aut, "nombre": nombre_aut})
             st.success("Autorizador registrado exitosamente.\n")
-            st.experimental_rerun()
+            st.rerun()
     else:
         st.success(f"Bienvenido/a, {aut['nombre']}")
 
@@ -68,7 +68,7 @@ if domain_aut:
                             "estado": "Pendiente"
                         })
                         st.success("Agente agregado a la cola.")
-                        st.experimental_rerun()
+                        st.rerun()
 
         # === PENDIENTES ===
         st.subheader("🕓 En cola (Pendiente)")
@@ -80,7 +80,7 @@ if domain_aut:
                     {"_id": p["_id"]},
                     {"$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}}
                 )
-                st.experimental_rerun()
+                st.rerun()
 
         # === AUTORIZADOS ===
         st.subheader("🟢 Autorizados (esperando que arranquen)")
@@ -92,7 +92,7 @@ if domain_aut:
                     {"_id": a["_id"]},
                     {"$set": {"estado": "En curso", "hora_inicio": ahora()}}
                 )
-                st.experimental_rerun()
+                st.rerun()
 
         # === EN CURSO ===
         st.subheader("⏳ Tiempos en curso")
