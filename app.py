@@ -5,7 +5,7 @@ import pytz
 import time
 
 # === CONFIGURACIÓN ===
-st.set_page_config(page_title="⏱ Registro de Tiempo Personal – personalito (Walmart DAS)", layout="centered")
+st.set_page_config(page_title="📋 Registro de Tiempo Personal – personalito (Walmart DAS)", layout="centered")
 MONGO_URI = st.secrets["mongo_uri"]
 client = pymongo.MongoClient(MONGO_URI)
 db = client["tiempo_personal"]
@@ -24,7 +24,7 @@ def calcular_tiempo(inicio):
     return f"{int(minutos):02d}m {int(segundos):02d}s"
 
 # === INICIO APP ===
-st.title("⏱ Registro de Tiempo Personal – personalito (Walmart DAS)")
+st.title("📋 Registro de Tiempo Personal – personalito (Walmart DAS)")
 
 # === IDENTIFICACIÓN AUTORIZADOR ===
 st.subheader("🔐 Identificación del autorizador")
