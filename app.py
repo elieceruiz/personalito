@@ -1,182 +1,184 @@
 import streamlit as st
+from datetime import datetime, timedelta
 import pymongo
-from datetime import datetime
 import pytz
 import pandas as pd
-import time
 
-# === CONFIGURACIÓN ===
-st.set_page_config(page_title="⏱ Registro de Tiempo Personal – personalito (Walmart DAS)", layout="centered")
+# CONFIGURACIÓN
+st.set_page_config(page_title="📋 Registro de Tiempo Personal – personalito (Walmart DAS)", layout="centered")
 MONGO_URI = st.secrets["mongo_uri"]
-client = pymongo.MongoClient(MONGO_URI)
-db = client["tiempo_personal"]
+cliente = pymongo.MongoClient(MONGO_URI)
+db = cliente["tiempo_personal"]
+col_tiempos = db["tiempos"]
 col_agentes = db["agentes"]
 col_autorizadores = db["autorizadores"]
-col_tiempos = db["tiempos"]
 zona_col = pytz.timezone("America/Bogota")
 
-# === FUNCIONES ===
+# FUNCIONES
 def ahora():
-    return datetime.utcnow()
+    return datetime.now(tz=zona_col)
 
-def hoy_colombia():
-    return datetime.now(zona_col).date()
-
-def tiempo_transcurrido(inicio):
-    if not inicio:
-        return "00:00:00"
-    if inicio.tzinfo is None:
-        inicio = inicio.replace(tzinfo=pytz.UTC)
-    delta = ahora() - inicio
-    horas, rem = divmod(int(delta.total_seconds()), 3600)
-    minutos, segundos = divmod(rem, 60)
+def formatear_duracion(delta):
+    total_segundos = int(delta.total_seconds())
+    horas = total_segundos // 3600
+    minutos = (total_segundos % 3600) // 60
+    segundos = total_segundos % 60
     return f"{horas:02}:{minutos:02}:{segundos:02}"
 
-# === INTERFAZ ===
-st.title("⏱ Registro de Tiempo Personal – personalito (Walmart DAS)")
-autorizador_id = st.text_input("Domain ID del autorizador", max_chars=50)
+def tiempo_transcurrido(doc):
+    estado = doc["estado"]
+    if estado == "Pendiente":
+        inicio = doc.get("hora_ingreso")
+    elif estado == "Autorizado":
+        inicio = doc.get("hora_autorizacion")
+    elif estado == "En curso":
+        inicio = doc.get("hora_inicio")
+    elif estado == "Completado":
+        inicio = doc.get("hora_inicio")
+        fin = doc.get("hora_fin")
+        if inicio and fin:
+            return formatear_duracion(fin - inicio)
+        return "—"
+    else:
+        return "—"
+    
+    if inicio:
+        return formatear_duracion(ahora() - inicio)
+    return "—"
 
-if autorizador_id:
-    autorizador = col_autorizadores.find_one({"domain_id": autorizador_id})
+# UI
+st.title("📋 Registro de Tiempo Personal – personalito (Walmart DAS)")
+
+# CONTADORES
+pendientes = list(col_tiempos.find({"estado": "Pendiente"}))
+autorizados = list(col_tiempos.find({"estado": "Autorizado"}))
+en_curso = list(col_tiempos.find({"estado": "En curso"}))
+completados = list(col_tiempos.find({"estado": "Completado"}))
+
+# MENÚ
+opcion = st.selectbox(
+    "Selecciona una sección:",
+    [
+        f"📥 Registrar nuevo agente en cola",
+        f"📤 En cola (Pendiente) ({len(pendientes)})",
+        f"🟢 Autorizados (esperando que arranquen) ({len(autorizados)})",
+        f"⏳ Tiempo personal en curso ({len(en_curso)})",
+        f"📜 Historial ({len(completados)})"
+    ]
+)
+
+# INGRESAR AUTORIZADOR
+st.subheader("🔐 Identificación del autorizador")
+domain_aut = st.text_input("Domain ID del autorizador")
+
+if domain_aut:
+    autorizador = col_autorizadores.find_one({"domain_id": domain_aut})
     if not autorizador:
         nombre_aut = st.text_input("Nombre del autorizador")
         if nombre_aut:
-            col_autorizadores.insert_one({"domain_id": autorizador_id, "nombre": nombre_aut})
-            st.success("Autorizador registrado exitosamente.")
+            col_autorizadores.insert_one({"domain_id": domain_aut, "nombre": nombre_aut})
+            st.success("Autorizador registrado.")
             st.rerun()
     else:
-        st.markdown(f"**👤 Bienvenido/a:** {autorizador['nombre']}")
-        seccion = st.selectbox(
-            "Selecciona una sección:",
-            [
-                "📋 Registrar nuevo agente en cola",
-                "📤 En cola (Pendiente)",
-                "🟢 Autorizados (esperando que arranquen)",
-                "⏳ Tiempo personal en curso",
-                "📜 Historial"
-            ]
-        )
+        st.success(f"Bienvenido/a, {autorizador['nombre']}")
 
-        if seccion == "📋 Registrar nuevo agente en cola":
-            st.subheader("Registrar nuevo agente")
-            domain_agente = st.text_input("Domain ID del agente", max_chars=50)
+        # REGISTRAR NUEVO AGENTE
+        if opcion.startswith("📥"):
+            st.subheader("Registrar nuevo agente en cola")
+            domain_agente = st.text_input("Domain ID del agente")
             if domain_agente:
-                agente = col_agentes.find_one({"domain_id": domain_agente})
-                if not agente:
+                existe = col_tiempos.find_one({
+                    "agente_id": domain_agente,
+                    "estado": {"$in": ["Pendiente", "Autorizado", "En curso"]}
+                })
+                if existe:
+                    st.warning("Este agente ya tiene un tiempo personal en curso.")
+                else:
                     nombre_agente = st.text_input("Nombre del agente")
                     if nombre_agente:
-                        col_agentes.insert_one({"domain_id": domain_agente, "nombre": nombre_agente})
-                        st.success("Agente registrado exitosamente.")
+                        # Validar o insertar en colección de agentes
+                        if not col_agentes.find_one({"domain_id": domain_agente}):
+                            col_agentes.insert_one({"domain_id": domain_agente, "nombre": nombre_agente})
+                        col_tiempos.insert_one({
+                            "agente_id": domain_agente,
+                            "agente_nombre": nombre_agente,
+                            "autorizador_id": domain_aut,
+                            "autorizador_nombre": autorizador["nombre"],
+                            "hora_ingreso": ahora(),
+                            "estado": "Pendiente"
+                        })
+                        st.success("Agente registrado y en cola.")
                         st.rerun()
-                else:
-                    # Restricción: ¿ya tiene uno completado hoy?
-                    completado_hoy = col_tiempos.find_one({
-                        "agente_id": domain_agente,
-                        "estado": "Completado",
-                        "hora_fin": {"$gte": datetime.combine(hoy_colombia(), datetime.min.time()).astimezone(pytz.UTC)}
-                    })
-                    if completado_hoy:
-                        st.warning("Este agente ya utilizó su tiempo personal hoy.")
-                    else:
-                        if st.button("➕ Agregar a la cola (Pendiente)"):
-                            ya_en_proceso = col_tiempos.find_one({
-                                "agente_id": domain_agente,
-                                "estado": {"$in": ["Pendiente", "Autorizado", "En curso"]}
-                            })
-                            if ya_en_proceso:
-                                st.warning("Este agente ya tiene un tiempo activo o pendiente.")
-                            else:
-                                col_tiempos.insert_one({
-                                    "agente_id": domain_agente,
-                                    "agente_nombre": agente["nombre"],
-                                    "autorizador_id": autorizador_id,
-                                    "autorizador_nombre": autorizador["nombre"],
-                                    "hora_ingreso": ahora(),
-                                    "estado": "Pendiente"
-                                })
-                                st.success("Agente agregado a la cola.")
-                                st.rerun()
 
-        elif seccion == "📤 En cola (Pendiente)":
-            pendientes = list(col_tiempos.find({"estado": "Pendiente"}).sort("hora_ingreso", 1))
-            st.subheader("Agentes en cola")
-            st.caption(f"Total en cola: {len(pendientes)}")
+        # PENDIENTES
+        elif opcion.startswith("📤"):
+            st.subheader("Agentes en cola (Pendiente)")
             if pendientes:
-                seleccion = st.selectbox("Selecciona un agente", pendientes, format_func=lambda x: x["agente_nombre"])
-                if seleccion:
-                    tiempo = tiempo_transcurrido(seleccion["hora_ingreso"])
-                    st.info(f"{seleccion['agente_nombre']} lleva {tiempo} esperando")
-                    if st.button("✅ Autorizar"):
-                        col_tiempos.update_one(
-                            {"_id": seleccion["_id"]},
-                            {"$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}}
-                        )
-                        st.success("Agente autorizado.")
-                        st.rerun()
+                seleccion = st.selectbox("Selecciona un agente", pendientes, format_func=lambda d: d["agente_nombre"])
+                tiempo = tiempo_transcurrido(seleccion)
+                st.info(f"⏳ Esperando desde hace: {tiempo}")
+                if st.button("✅ Autorizar"):
+                    col_tiempos.update_one({"_id": seleccion["_id"]}, {
+                        "$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}
+                    })
+                    st.rerun()
             else:
                 st.info("No hay agentes en cola.")
 
-        elif seccion == "🟢 Autorizados (esperando que arranquen)":
-            autorizados = list(col_tiempos.find({"estado": "Autorizado"}).sort("hora_autorizacion", 1))
+        # AUTORIZADOS
+        elif opcion.startswith("🟢"):
             st.subheader("Agentes autorizados")
-            st.caption(f"Total autorizados: {len(autorizados)}")
             if autorizados:
-                seleccion = st.selectbox("Selecciona un agente", autorizados, format_func=lambda x: x["agente_nombre"])
-                if seleccion:
-                    tiempo = tiempo_transcurrido(seleccion["hora_autorizacion"])
-                    st.info(f"{seleccion['agente_nombre']} fue autorizado hace {tiempo}")
-                    if st.button("▶️ Iniciar tiempo"):
-                        col_tiempos.update_one(
-                            {"_id": seleccion["_id"]},
-                            {"$set": {"estado": "En curso", "hora_inicio": ahora()}}
-                        )
-                        st.success("Tiempo iniciado.")
-                        st.rerun()
+                seleccion = st.selectbox("Selecciona un agente", autorizados, format_func=lambda d: d["agente_nombre"])
+                tiempo = tiempo_transcurrido(seleccion)
+                st.info(f"⏳ Autorizado hace: {tiempo}")
+                if st.button("▶️ Iniciar tiempo"):
+                    col_tiempos.update_one({"_id": seleccion["_id"]}, {
+                        "$set": {"estado": "En curso", "hora_inicio": ahora()}
+                    })
+                    st.rerun()
             else:
                 st.info("No hay agentes autorizados.")
 
-        elif seccion == "⏳ Tiempo personal en curso":
-            en_curso = list(col_tiempos.find({"estado": "En curso"}).sort("hora_inicio", 1))
-            st.subheader("Tiempo en curso")
-            st.caption(f"Total en curso: {len(en_curso)}")
+        # EN CURSO
+        elif opcion.startswith("⏳"):
+            st.subheader("Agentes con tiempo personal en curso")
             if en_curso:
-                seleccion = st.selectbox("Selecciona un agente", en_curso, format_func=lambda x: x["agente_nombre"])
-                if seleccion:
-                    tiempo = tiempo_transcurrido(seleccion["hora_inicio"])
-                    st.info(f"{seleccion['agente_nombre']} lleva {tiempo} en tiempo personal")
-                    if st.button("🛑 Finalizar tiempo"):
-                        fin = ahora()
-                        duracion = (fin - seleccion["hora_inicio"]).total_seconds()
-                        col_tiempos.update_one(
-                            {"_id": seleccion["_id"]},
-                            {"$set": {
-                                "estado": "Completado",
-                                "hora_fin": fin,
-                                "duracion_segundos": int(duracion)
-                            }}
-                        )
-                        st.success(f"Tiempo finalizado: {int(duracion)} segundos")
-                        st.rerun()
-            else:
-                st.info("No hay tiempos personales activos.")
-
-        elif seccion == "📜 Historial":
-            completados = list(col_tiempos.find({"estado": "Completado"}).sort("hora_fin", -1))
-            if completados:
-                historial = []
-                for i, r in enumerate(completados, 1):
-                    inicio = r.get("hora_inicio", None)
-                    fin = r.get("hora_fin", None)
-                    duracion = r.get("duracion_segundos", 0)
-                    historial.append({
-                        "#": len(completados) - i + 1,
-                        "Agente": r["agente_nombre"],
-                        "Autorizador": r["autorizador_nombre"],
-                        "Inicio": inicio.astimezone(zona_col).strftime("%Y-%m-%d %H:%M:%S") if inicio else "",
-                        "Fin": fin.astimezone(zona_col).strftime("%Y-%m-%d %H:%M:%S") if fin else "",
-                        "Duración": time.strftime('%H:%M:%S', time.gmtime(duracion))
+                seleccion = st.selectbox("Selecciona un agente", en_curso, format_func=lambda d: d["agente_nombre"])
+                tiempo = tiempo_transcurrido(seleccion)
+                st.info(f"⏳ En curso desde hace: {tiempo}")
+                if st.button("🛑 Finalizar tiempo"):
+                    ahora_ = ahora()
+                    inicio = seleccion.get("hora_inicio")
+                    duracion = (ahora_ - inicio).total_seconds() / 60
+                    col_tiempos.update_one({"_id": seleccion["_id"]}, {
+                        "$set": {
+                            "estado": "Completado",
+                            "hora_fin": ahora_,
+                            "duracion_minutos": round(duracion, 2)
+                        }
                     })
-                df = pd.DataFrame(historial)
+                    st.success(f"Tiempo finalizado: {round(duracion, 2)} minutos.")
+                    st.rerun()
+            else:
+                st.info("No hay tiempos en curso.")
+
+        # HISTORIAL
+        elif opcion.startswith("📜"):
+            st.subheader("Historial de tiempos finalizados")
+            if completados:
+                completados = sorted(completados, key=lambda d: d["hora_fin"], reverse=True)
+                data = []
+                for i, item in enumerate(completados, 1):
+                    duracion = tiempo_transcurrido(item)
+                    fecha = item["hora_fin"].astimezone(zona_col).strftime("%Y-%m-%d")
+                    data.append({
+                        "N°": len(completados) - i + 1,
+                        "Agente": item["agente_nombre"],
+                        "Duración": duracion,
+                        "Fecha": fecha
+                    })
+                df = pd.DataFrame(data)
                 st.dataframe(df, use_container_width=True)
             else:
-                st.info("No hay registros completados aún.")
+                st.info("Aún no hay registros completados.")
