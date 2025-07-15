@@ -49,7 +49,7 @@ if domain_aut:
                 if nombre_agente:
                     col_agentes.insert_one({"domain_id": domain_agente, "nombre": nombre_agente})
                     st.success("Agente registrado. Continúe con la autorización.")
-                    st.experimental_rerun()
+                    st. rerun()
             else:
                 if st.button("➕ Agregar a la cola (Pendiente)"):
                     ya_en_cola = col_tiempos.find_one({
