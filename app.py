@@ -1,11 +1,12 @@
 import streamlit as st
 import pymongo
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import pytz
+import time
 
 # === CONFIGURACIÓN ===
-st.set_page_config(page_title="⏱ Registro de Tiempo Personal – CC VIVA", layout="centered")
+st.set_page_config(page_title="⏱ Registro de Tiempo Personal – personalito (Walmart DAS)", layout="centered")
 MONGO_URI = st.secrets["mongo_uri"]
 client = pymongo.MongoClient(MONGO_URI)
 db = client["tiempo_personal"]
@@ -17,11 +18,6 @@ zona_col = pytz.timezone("America/Bogota")
 # === FUNCIONES ===
 def ahora():
     return datetime.utcnow()
-
-def tiempo_transcurrido(inicio):
-    delta = ahora() - inicio
-    minutos, segundos = divmod(delta.total_seconds(), 60)
-    return f"{int(minutos)}m {int(segundos)}s"
 
 # === INGRESO DE AUTORIZADOR ===
 st.title("⏱ Registro de Tiempo Personal – personalito (Walmart DAS)")
@@ -49,7 +45,7 @@ if domain_aut:
                 if nombre_agente:
                     col_agentes.insert_one({"domain_id": domain_agente, "nombre": nombre_agente})
                     st.success("Agente registrado. Continúe con la autorización.")
-                    st. rerun()
+                    st.rerun()
             else:
                 if st.button("➕ Agregar a la cola (Pendiente)"):
                     ya_en_cola = col_tiempos.find_one({
@@ -74,46 +70,73 @@ if domain_aut:
         st.subheader("🕓 En cola (Pendiente)")
         pendientes = list(col_tiempos.find({"estado": "Pendiente"}))
         for p in pendientes:
-            st.write(f"{p['agente_nombre']} ({p['agente_id']}) – {tiempo_transcurrido(p['hora_ingreso'])} en cola")
-            if st.button(f"✅ Autorizar {p['agente_id']}"):
-                col_tiempos.update_one(
-                    {"_id": p["_id"]},
-                    {"$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}}
-                )
-                st.rerun()
+            st.markdown(f"**{p['agente_nombre']} ({p['agente_id']})**")
+            cronometro = st.empty()
+            autorizar_btn = st.button(f"✅ Autorizar {p['agente_id']}")
+
+            hora_ingreso = p["hora_ingreso"].replace(tzinfo=pytz.UTC).astimezone(zona_col)
+            segundos_transcurridos = int((datetime.now(zona_col) - hora_ingreso).total_seconds())
+
+            for i in range(segundos_transcurridos, segundos_transcurridos + 1):
+                if autorizar_btn:
+                    col_tiempos.update_one(
+                        {"_id": p["_id"]},
+                        {"$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}}
+                    )
+                    st.rerun()
+                duracion_str = str(timedelta(seconds=i))
+                cronometro.markdown(f"🕒 En cola: `{duracion_str}`")
 
         # === AUTORIZADOS ===
         st.subheader("🟢 Autorizados (esperando que arranquen)")
         autorizados = list(col_tiempos.find({"estado": "Autorizado"}))
         for a in autorizados:
-            st.write(f"{a['agente_nombre']} ({a['agente_id']}) – Autorizado hace {tiempo_transcurrido(a['hora_autorizacion'])}")
-            if st.button(f"▶️ Iniciar tiempo de {a['agente_id']}"):
-                col_tiempos.update_one(
-                    {"_id": a["_id"]},
-                    {"$set": {"estado": "En curso", "hora_inicio": ahora()}}
-                )
-                st.rerun()
+            st.markdown(f"**{a['agente_nombre']} ({a['agente_id']})**")
+            cronometro = st.empty()
+            iniciar_btn = st.button(f"▶️ Iniciar tiempo de {a['agente_id']}")
+
+            hora_aut = a["hora_autorizacion"].replace(tzinfo=pytz.UTC).astimezone(zona_col)
+            segundos_transcurridos = int((datetime.now(zona_col) - hora_aut).total_seconds())
+
+            for i in range(segundos_transcurridos, segundos_transcurridos + 1):
+                if iniciar_btn:
+                    col_tiempos.update_one(
+                        {"_id": a["_id"]},
+                        {"$set": {"estado": "En curso", "hora_inicio": ahora()}}
+                    )
+                    st.rerun()
+                duracion_str = str(timedelta(seconds=i))
+                cronometro.markdown(f"🕒 Esperando inicio: `{duracion_str}`")
 
         # === EN CURSO ===
         st.subheader("⏳ Tiempos en curso")
         en_curso = list(col_tiempos.find({"estado": "En curso"}))
         for e in en_curso:
-            st.write(f"{e['agente_nombre']} ({e['agente_id']}) – {tiempo_transcurrido(e['hora_inicio'])} en curso")
-            if st.button(f"🛑 Finalizar tiempo de {e['agente_id']}"):
-                fin = ahora()
-                duracion = (fin - e['hora_inicio']).total_seconds() / 60
-                col_tiempos.update_one(
-                    {"_id": e["_id"]},
-                    {
-                        "$set": {
-                            "estado": "Completado",
-                            "hora_fin": fin,
-                            "duracion_minutos": round(duracion, 2)
+            st.markdown(f"**{e['agente_nombre']} ({e['agente_id']})**")
+            cronometro = st.empty()
+            finalizar_btn = st.button(f"🛑 Finalizar tiempo de {e['agente_id']}")
+
+            hora_ini = e["hora_inicio"].replace(tzinfo=pytz.UTC).astimezone(zona_col)
+            segundos_transcurridos = int((datetime.now(zona_col) - hora_ini).total_seconds())
+
+            for i in range(segundos_transcurridos, segundos_transcurridos + 1):
+                if finalizar_btn:
+                    fin = ahora()
+                    duracion = (fin - e["hora_inicio"]).total_seconds() / 60
+                    col_tiempos.update_one(
+                        {"_id": e["_id"]},
+                        {
+                            "$set": {
+                                "estado": "Completado",
+                                "hora_fin": fin,
+                                "duracion_minutos": round(duracion, 2)
+                            }
                         }
-                    }
-                )
-                st.success(f"Tiempo finalizado: {round(duracion, 2)} minutos")
-                st.experimental_rerun()
+                    )
+                    st.success(f"Tiempo finalizado: {round(duracion, 2)} minutos")
+                    st.rerun()
+                duracion_str = str(timedelta(seconds=i))
+                cronometro.markdown(f"🕒 Tiempo activo: `{duracion_str}`")
 
         # === HISTORIAL ===
         st.subheader("📜 Historial")
