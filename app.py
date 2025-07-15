@@ -5,7 +5,7 @@ import pandas as pd
 import pytz
 
 # === CONFIGURACIÓN ===
-st.set_page_config(page_title="⏱ Registro de Tiempo Personal – personalito (Walmart DAS)", layout="centered")
+st.set_page_config(page_title="Registro de Tiempo Personal – personalito (Walmart DAS)", layout="centered")
 MONGO_URI = st.secrets["mongo_uri"]
 client = pymongo.MongoClient(MONGO_URI)
 db = client["tiempo_personal"]
