@@ -37,8 +37,8 @@ st.title("📋 Registro de Tiempo Personal – personalito (Walmart DAS)")
 secciones = [
     "📋 Registrar nuevo agente en cola",
     f"📤 En cola (Pendiente) [{n_pendientes}]",
-    f"🟢 Autorizados (esperando que arranquen) [{n_autorizados}]",
-    f"⏱️ Tiempo personal en curso [{n_en_curso}]",
+    f"🟢 Autorizadx [{n_autorizados}]",
+    f"⏱️ En curso [{n_en_curso}]",
     "📜 Historial"
 ]
 seleccion = st.selectbox("Selecciona una sección:", secciones)
