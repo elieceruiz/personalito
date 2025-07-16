@@ -191,14 +191,7 @@ if domain_aut:
                         "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"])
                     })
 
-                df = pd.DataFrame(historial).reset_index(drop=True)
-
-                hide_table_row_index = """
-                    <style>
-                    thead tr th:first-child {display:none}
-                    tbody th {display:none}
-                    </style>
-                """
-                st.markdown(hide_table_row_index, unsafe_allow_html=True)
+                df = pd.DataFrame(historial)
+                df.index = ['' for _ in df.index]  # Oculta índice de pandas
 
                 st.dataframe(df, use_container_width=True)
