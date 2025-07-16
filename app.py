@@ -179,15 +179,18 @@ if domain_aut:
             else:
                 historial = []
                 for i, c in enumerate(completados, 1):
+                    inicio = c["hora_inicio"].astimezone(zona_col)
+                    fin = c["hora_fin"].astimezone(zona_col)
                     historial.append({
                         "#": len(completados) - i + 1,
                         "Agente": c["agente_nombre"],
                         "Domain ID": c["agente_id"],
                         "Autorizador": c["autorizador_nombre"],
-                        "Fecha": c["hora_inicio"].astimezone(zona_col).strftime("%Y-%m-%d"),
-                        "Horario": f"{c['hora_inicio'].astimezone(zona_col).strftime('%H:%M:%S')} - {c['hora_fin'].astimezone(zona_col).strftime('%H:%M:%S')}",
-                        "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"]) if "hora_fin" in c else "-"
+                        "Fecha": inicio.strftime("%Y-%m-%d"),
+                        "Horario": f"{inicio.strftime('%H:%M:%S')} - {fin.strftime('%H:%M:%S')}",
+                        "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"])
                     })
         
-                df = pd.DataFrame(historial).reset_index(drop=True)
+                df = pd.DataFrame(historial)
+                df.index = [""] * len(df)  # Oculta índice visual de pandas
                 st.dataframe(df, use_container_width=True)
