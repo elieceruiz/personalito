@@ -100,8 +100,11 @@ if domain_aut:
                 seleccionado = st.selectbox("Selecciona un agente", [f"{p['agente_nombre']} ({p['agente_id']})" for p in pendientes])
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(p for p in pendientes if p["agente_id"] == agente_id)
-                tiempo = tiempo_transcurrido(agente_data["hora_ingreso"])
-                st.write(f"⏳ Esperando hace: {tiempo}")
+                espacio = st.empty()
+                for _ in range(300):
+                    tiempo = tiempo_transcurrido(agente_data["hora_ingreso"])
+                    espacio.write(f"⏳ Esperando hace: {tiempo}")
+                    time.sleep(1)
                 if st.button("✅ Autorizar"):
                     col_tiempos.update_one(
                         {"_id": agente_data["_id"]},
@@ -117,8 +120,11 @@ if domain_aut:
                 seleccionado = st.selectbox("Selecciona un agente", [f"{a['agente_nombre']} ({a['agente_id']})" for a in autorizados])
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(a for a in autorizados if a["agente_id"] == agente_id)
-                tiempo = tiempo_transcurrido(agente_data["hora_autorizacion"])
-                st.write(f"⏳ Autorizado hace: {tiempo}")
+                espacio = st.empty()
+                for _ in range(300):
+                    tiempo = tiempo_transcurrido(agente_data["hora_autorizacion"])
+                    espacio.write(f"⏳ Autorizado hace: {tiempo}")
+                    time.sleep(1)
                 if st.button("▶️ Iniciar tiempo"):
                     col_tiempos.update_one(
                         {"_id": agente_data["_id"]},
@@ -134,8 +140,11 @@ if domain_aut:
                 seleccionado = st.selectbox("Selecciona un agente", [f"{e['agente_nombre']} ({e['agente_id']})" for e in en_curso])
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(e for e in en_curso if e["agente_id"] == agente_id)
-                tiempo = tiempo_transcurrido(agente_data["hora_inicio"])
-                st.write(f"⏳ En curso desde: {tiempo}")
+                espacio = st.empty()
+                for _ in range(360):
+                    tiempo = tiempo_transcurrido(agente_data["hora_inicio"])
+                    espacio.write(f"⏳ En curso desde: {tiempo}")
+                    time.sleep(1)
                 if st.button("🛑 Finalizar tiempo"):
                     fin = ahora()
                     duracion = fin - agente_data["hora_inicio"]
@@ -157,14 +166,13 @@ if domain_aut:
             else:
                 historial = []
                 for i, c in enumerate(completados, 1):
-                    duracion = formatear_duracion(datetime.utcnow() - c["hora_inicio"]) if "hora_fin" not in c else formatear_duracion(datetime.utcnow() - c["hora_inicio"])
                     historial.append({
                         "#": len(completados) - i + 1,
                         "Agente": c["agente_nombre"],
                         "Domain ID": c["agente_id"],
                         "Autorizador": c["autorizador_nombre"],
                         "Fecha": c["hora_inicio"].astimezone(zona_col).strftime("%Y-%m-%d"),
-                        "Duración": formatear_duracion(datetime.utcnow() - c["hora_inicio"]) if "hora_fin" not in c else formatear_duracion(c["hora_fin"] - c["hora_inicio"])
+                        "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"]) if "hora_fin" in c else "-"
                     })
                 df = pd.DataFrame(historial)
                 st.dataframe(df, use_container_width=True)
