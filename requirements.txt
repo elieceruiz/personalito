@@ -1,5 +1,4 @@
 streamlit
 pymongo
-pytz
-streamlit-autorefresh
 pandas
+pytz
