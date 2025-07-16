@@ -31,7 +31,6 @@ def ya_solicito_hoy(domain_id):
     ahora_col = datetime.now(zona_col)
     inicio_dia = ahora_col.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(pytz.utc)
     fin_dia = ahora_col.replace(hour=23, minute=59, second=59, microsecond=999999).astimezone(pytz.utc)
-
     registro = col_tiempos.find_one({
         "agente_id": domain_id,
         "estado": "Completado",
@@ -70,7 +69,6 @@ if domain_aut:
                         "agente_id": domain_agente,
                         "estado": "Completado"
                     }, sort=[("hora_fin", -1)])
-
                     if registro:
                         hora_fin_col = registro["hora_fin"].astimezone(zona_col).strftime("%H:%M:%S")
                         st.info(f"⛔ Este agente ya completó su tiempo personal hoy a las {hora_fin_col}.")
@@ -85,7 +83,7 @@ if domain_aut:
                             st.success("Agente registrado.")
                             st.rerun()
                     else:
-                        if st.button("➕ Agregar a la cola (Pendiente)"):
+                        if st.button("➕ Agregar a la cola (Pendiente)", key=f"add_{domain_agente}"):
                             existente = col_tiempos.find_one({
                                 "agente_id": domain_agente,
                                 "estado": {"$in": ["Pendiente", "Autorizado", "En curso"]}
@@ -113,18 +111,17 @@ if domain_aut:
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(p for p in pendientes if p["agente_id"] == agente_id)
                 espacio = st.empty()
-                boton = st.button("✅ Autorizar")
-                while espacio and not boton:
+                boton = st.button("✅ Autorizar", key=f"aut_{agente_id}")
+                for _ in range(300):
                     tiempo = tiempo_transcurrido(agente_data["hora_ingreso"])
                     espacio.write(f"⏳ Esperando hace: {tiempo}")
                     time.sleep(1)
-                    boton = st.button("✅ Autorizar")
-                if boton:
-                    col_tiempos.update_one(
-                        {"_id": agente_data["_id"]},
-                        {"$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}}
-                    )
-                    st.rerun()
+                    if boton:
+                        col_tiempos.update_one(
+                            {"_id": agente_data["_id"]},
+                            {"$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}}
+                        )
+                        st.rerun()
 
         elif seleccion == "🟢 Autorizados (esperando que arranquen)":
             autorizados = list(col_tiempos.find({"estado": "Autorizado"}))
@@ -135,18 +132,17 @@ if domain_aut:
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(a for a in autorizados if a["agente_id"] == agente_id)
                 espacio = st.empty()
-                boton = st.button("▶️ Iniciar tiempo")
-                while espacio and not boton:
+                boton = st.button("▶️ Iniciar tiempo", key=f"iniciar_{agente_id}")
+                for _ in range(300):
                     tiempo = tiempo_transcurrido(agente_data["hora_autorizacion"])
                     espacio.write(f"⏳ Autorizado hace: {tiempo}")
                     time.sleep(1)
-                    boton = st.button("▶️ Iniciar tiempo")
-                if boton:
-                    col_tiempos.update_one(
-                        {"_id": agente_data["_id"]},
-                        {"$set": {"estado": "En curso", "hora_inicio": ahora()}}
-                    )
-                    st.rerun()
+                    if boton:
+                        col_tiempos.update_one(
+                            {"_id": agente_data["_id"]},
+                            {"$set": {"estado": "En curso", "hora_inicio": ahora()}}
+                        )
+                        st.rerun()
 
         elif seleccion == "⏳ Tiempo personal en curso":
             en_curso = list(col_tiempos.find({"estado": "En curso"}))
@@ -157,25 +153,24 @@ if domain_aut:
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(e for e in en_curso if e["agente_id"] == agente_id)
                 espacio = st.empty()
-                boton = st.button("🛑 Finalizar tiempo")
-                while espacio and not boton:
+                boton = st.button("🛑 Finalizar tiempo", key=f"fin_{agente_id}")
+                for _ in range(360):
                     tiempo = tiempo_transcurrido(agente_data["hora_inicio"])
                     espacio.write(f"⏳ En curso desde: {tiempo}")
                     time.sleep(1)
-                    boton = st.button("🛑 Finalizar tiempo")
-                if boton:
-                    fin = ahora()
-                    duracion = fin - agente_data["hora_inicio"]
-                    col_tiempos.update_one(
-                        {"_id": agente_data["_id"]},
-                        {"$set": {
-                            "estado": "Completado",
-                            "hora_fin": fin,
-                            "duracion_segundos": int(duracion.total_seconds())
-                        }}
-                    )
-                    st.success(f"Tiempo finalizado: {formatear_duracion(duracion)}")
-                    st.rerun()
+                    if boton:
+                        fin = ahora()
+                        duracion = fin - agente_data["hora_inicio"]
+                        col_tiempos.update_one(
+                            {"_id": agente_data["_id"]},
+                            {"$set": {
+                                "estado": "Completado",
+                                "hora_fin": fin,
+                                "duracion_segundos": int(duracion.total_seconds())
+                            }}
+                        )
+                        st.success(f"Tiempo finalizado: {formatear_duracion(duracion)}")
+                        st.rerun()
 
         elif seleccion == "📑 Historial":
             completados = list(col_tiempos.find({"estado": "Completado"}).sort("hora_fin", -1))
@@ -184,15 +179,27 @@ if domain_aut:
             else:
                 historial = []
                 for i, c in enumerate(completados, 1):
-                    horario = f"{c['hora_inicio'].astimezone(zona_col).strftime('%H:%M:%S')} - {c['hora_fin'].astimezone(zona_col).strftime('%H:%M:%S')}"
+                    hora_inicio_local = c["hora_inicio"].astimezone(zona_col)
+                    hora_fin_local = c["hora_fin"].astimezone(zona_col)
                     historial.append({
                         "#": len(completados) - i + 1,
                         "Agente": c["agente_nombre"],
                         "Domain ID": c["agente_id"],
                         "Autorizador": c["autorizador_nombre"],
-                        "Fecha": c["hora_inicio"].astimezone(zona_col).strftime("%Y-%m-%d"),
-                        "Horario": horario,
+                        "Fecha": hora_inicio_local.strftime("%Y-%m-%d"),
+                        "Horario": f"{hora_inicio_local.strftime('%H:%M:%S')} - {hora_fin_local.strftime('%H:%M:%S')}",
                         "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"])
                     })
+                
                 df = pd.DataFrame(historial)
-                st.dataframe(df.set_index("#"), use_container_width=True)
+        
+                # === OCULTAR ÍNDICE DE PANDAS EN STREAMLIT ===
+                hide_table_row_index = """
+                    <style>
+                    thead tr th:first-child {display:none}
+                    tbody th {display:none}
+                    </style>
+                """
+                st.markdown(hide_table_row_index, unsafe_allow_html=True)
+        
+                st.dataframe(df, use_container_width=True)
