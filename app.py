@@ -189,6 +189,5 @@ if domain_aut:
                         "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"]) if "hora_fin" in c else "-"
                     })
         
-                df = pd.DataFrame(historial)
-                df.index = [''] * len(df)  # 🔥 Elimina la columna de índice 0
+                df = pd.DataFrame(historial).reset_index(drop=True)
                 st.dataframe(df, use_container_width=True)
