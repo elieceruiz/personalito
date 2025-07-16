@@ -194,12 +194,5 @@ if domain_aut:
 
                 df = pd.DataFrame(historial)
 
-                # Ocultar índice duplicado
-                st.markdown("""
-                    <style>
-                    thead tr th:first-child {display:none}
-                    tbody th {display:none}
-                    </style>
-                """, unsafe_allow_html=True)
-
-                st.dataframe(df, use_container_width=True)
+                # Ocultar índice de pandas
+                st.dataframe(df, use_container_width=True, hide_index=True)
