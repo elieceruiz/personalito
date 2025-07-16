@@ -185,7 +185,10 @@ if domain_aut:
                         "Domain ID": c["agente_id"],
                         "Autorizador": c["autorizador_nombre"],
                         "Fecha": c["hora_inicio"].astimezone(zona_col).strftime("%Y-%m-%d"),
+                        "Horario": f"{c['hora_inicio'].astimezone(zona_col).strftime('%H:%M:%S')} - {c['hora_fin'].astimezone(zona_col).strftime('%H:%M:%S')}",
                         "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"]) if "hora_fin" in c else "-"
                     })
+        
                 df = pd.DataFrame(historial)
+                df.index = [''] * len(df)  # 🔥 Elimina la columna de índice 0
                 st.dataframe(df, use_container_width=True)
