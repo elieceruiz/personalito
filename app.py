@@ -28,11 +28,14 @@ def tiempo_transcurrido(inicio):
     return formatear_duracion(ahora() - inicio)
 
 def ya_solicito_hoy(domain_id):
-    hoy = datetime.utcnow().date()
+    ahora_col = datetime.now(zona_col)
+    inicio_dia = ahora_col.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(pytz.utc)
+    fin_dia = ahora_col.replace(hour=23, minute=59, second=59, microsecond=999999).astimezone(pytz.utc)
+
     registro = col_tiempos.find_one({
         "agente_id": domain_id,
         "estado": "Completado",
-        "hora_fin": {"$gte": datetime(hoy.year, hoy.month, hoy.day)}
+        "hora_fin": {"$gte": inicio_dia, "$lte": fin_dia}
     })
     return bool(registro)
 
@@ -62,6 +65,17 @@ if domain_aut:
         if seleccion == "📤 Registrar nuevo agente en cola":
             domain_agente = st.text_input("🆔 Domain ID del agente")
             if domain_agente:
+                if ya_solicito_hoy(domain_agente):
+                    registro = col_tiempos.find_one({
+                        "agente_id": domain_agente,
+                        "estado": "Completado"
+                    }, sort=[("hora_fin", -1)])
+    
+                    if registro:
+                        hora_fin_col = registro["hora_fin"].astimezone(zona_col).strftime("%H:%M:%S")
+                        st.info(f"⛔ Este agente ya completó su tiempo personal hoy a las {hora_fin_col}.")
+                    else:
+                        st.warning("⛔ Este agente ya ha solicitado tiempo personal hoy.")
                 if ya_solicito_hoy(domain_agente):
                     st.warning("Este agente ya ha solicitado tiempo personal hoy.")
                 else:
