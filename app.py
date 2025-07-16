@@ -31,12 +31,16 @@ def ya_solicito_hoy(domain_id):
     ahora_col = datetime.now(zona_col)
     inicio_dia = ahora_col.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(pytz.utc)
     fin_dia = ahora_col.replace(hour=23, minute=59, second=59, microsecond=999999).astimezone(pytz.utc)
+
     registro = col_tiempos.find_one({
         "agente_id": domain_id,
         "estado": "Completado",
         "hora_fin": {"$gte": inicio_dia, "$lte": fin_dia}
     })
     return bool(registro)
+
+# === REFRESCO PARA CRONÓMETROS AL SEGUNDO ===
+st_autorefresh(interval=1000, limit=100000, key="cronometros")
 
 # === INTERFAZ ===
 st.title("📋 Registro de Tiempo Personal – personalito (Walmart DAS)")
@@ -72,8 +76,6 @@ if domain_aut:
                     if registro:
                         hora_fin_col = registro["hora_fin"].astimezone(zona_col).strftime("%H:%M:%S")
                         st.info(f"⛔ Este agente ya completó su tiempo personal hoy a las {hora_fin_col}.")
-                    else:
-                        st.warning("⛔ Este agente ya ha solicitado tiempo personal hoy.")
                 else:
                     agente = col_agentes.find_one({"domain_id": domain_agente})
                     if not agente:
@@ -103,7 +105,6 @@ if domain_aut:
                                 st.rerun()
 
         elif seleccion == "📤 En cola (Pendiente)":
-            st_autorefresh(interval=1000, key="pendiente_refresh")
             pendientes = list(col_tiempos.find({"estado": "Pendiente"}))
             if not pendientes:
                 st.info("No hay agentes en cola.")
@@ -121,7 +122,6 @@ if domain_aut:
                     st.rerun()
 
         elif seleccion == "🟢 Autorizados (esperando que arranquen)":
-            st_autorefresh(interval=1000, key="autorizado_refresh")
             autorizados = list(col_tiempos.find({"estado": "Autorizado"}))
             if not autorizados:
                 st.info("No hay agentes autorizados.")
@@ -139,7 +139,6 @@ if domain_aut:
                     st.rerun()
 
         elif seleccion == "⏳ Tiempo personal en curso":
-            st_autorefresh(interval=1000, key="curso_refresh")
             en_curso = list(col_tiempos.find({"estado": "En curso"}))
             if not en_curso:
                 st.info("No hay agentes en tiempo personal.")
