@@ -190,10 +190,9 @@ if domain_aut:
                         "Horario": f"{hora_inicio_local.strftime('%H:%M:%S')} - {hora_fin_local.strftime('%H:%M:%S')}",
                         "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"])
                     })
-                
-                df = pd.DataFrame(historial)
-        
-                # === OCULTAR ÍNDICE DE PANDAS EN STREAMLIT ===
+
+                df = pd.DataFrame(historial).reset_index(drop=True)
+
                 hide_table_row_index = """
                     <style>
                     thead tr th:first-child {display:none}
@@ -201,5 +200,5 @@ if domain_aut:
                     </style>
                 """
                 st.markdown(hide_table_row_index, unsafe_allow_html=True)
-        
+
                 st.dataframe(df, use_container_width=True)
