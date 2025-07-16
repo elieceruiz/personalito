@@ -36,6 +36,16 @@ def ya_solicito_hoy(domain_id):
     })
     return bool(registro)
 
+def mostrar_cronometro(etiqueta, inicio):
+    placeholder = st.empty()
+    # Esto asegura que el bucle se detenga cuando se haga una acción
+    for _ in range(10000):
+        tiempo = tiempo_transcurrido(inicio)
+        placeholder.write(f"{etiqueta} {tiempo}")
+        time.sleep(1)
+        if st.session_state.get("detener_cronometro", False):
+            break
+
 # === INTERFAZ ===
 st.title("📋 Registro de Tiempo Personal – personalito (Walmart DAS)")
 domain_aut = st.text_input("🧑‍💼 Domain ID del autorizador")
@@ -100,14 +110,18 @@ if domain_aut:
                 seleccionado = st.selectbox("Selecciona un agente", [f"{p['agente_nombre']} ({p['agente_id']})" for p in pendientes])
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(p for p in pendientes if p["agente_id"] == agente_id)
-                tiempo = tiempo_transcurrido(agente_data["hora_ingreso"])
-                st.write(f"⏳ Esperando hace: {tiempo}")
+                # Cronómetro en tiempo real
+                if "detener_cronometro" not in st.session_state:
+                    st.session_state["detener_cronometro"] = False
+                mostrar_cronometro("⏳ Esperando hace:", agente_data["hora_ingreso"])
                 if st.button("✅ Autorizar"):
+                    st.session_state["detener_cronometro"] = True
                     col_tiempos.update_one(
                         {"_id": agente_data["_id"]},
                         {"$set": {"estado": "Autorizado", "hora_autorizacion": ahora()}}
                     )
                     st.rerun()
+                st.session_state["detener_cronometro"] = False
 
         elif seleccion == "🟢 Autorizados (esperando que arranquen)":
             autorizados = list(col_tiempos.find({"estado": "Autorizado"}))
@@ -117,14 +131,18 @@ if domain_aut:
                 seleccionado = st.selectbox("Selecciona un agente", [f"{a['agente_nombre']} ({a['agente_id']})" for a in autorizados])
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(a for a in autorizados if a["agente_id"] == agente_id)
-                tiempo = tiempo_transcurrido(agente_data["hora_autorizacion"])
-                st.write(f"⏳ Autorizado hace: {tiempo}")
+                # Cronómetro en tiempo real
+                if "detener_cronometro" not in st.session_state:
+                    st.session_state["detener_cronometro"] = False
+                mostrar_cronometro("⏳ Autorizado hace:", agente_data["hora_autorizacion"])
                 if st.button("▶️ Iniciar tiempo"):
+                    st.session_state["detener_cronometro"] = True
                     col_tiempos.update_one(
                         {"_id": agente_data["_id"]},
                         {"$set": {"estado": "En curso", "hora_inicio": ahora()}}
                     )
                     st.rerun()
+                st.session_state["detener_cronometro"] = False
 
         elif seleccion == "⏳ Tiempo personal en curso":
             en_curso = list(col_tiempos.find({"estado": "En curso"}))
@@ -134,9 +152,12 @@ if domain_aut:
                 seleccionado = st.selectbox("Selecciona un agente", [f"{e['agente_nombre']} ({e['agente_id']})" for e in en_curso])
                 agente_id = seleccionado.split("(")[-1].replace(")", "")
                 agente_data = next(e for e in en_curso if e["agente_id"] == agente_id)
-                tiempo = tiempo_transcurrido(agente_data["hora_inicio"])
-                st.write(f"⏳ En curso desde: {tiempo}")
+                # Cronómetro en tiempo real
+                if "detener_cronometro" not in st.session_state:
+                    st.session_state["detener_cronometro"] = False
+                mostrar_cronometro("⏳ En curso desde:", agente_data["hora_inicio"])
                 if st.button("🛑 Finalizar tiempo"):
+                    st.session_state["detener_cronometro"] = True
                     fin = ahora()
                     duracion = fin - agente_data["hora_inicio"]
                     col_tiempos.update_one(
@@ -149,6 +170,7 @@ if domain_aut:
                     )
                     st.success(f"Tiempo finalizado: {formatear_duracion(duracion)}")
                     st.rerun()
+                st.session_state["detener_cronometro"] = False
 
         elif seleccion == "📑 Historial":
             completados = list(col_tiempos.find({"estado": "Completado"}).sort("hora_fin", -1))
