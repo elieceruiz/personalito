@@ -179,18 +179,27 @@ if domain_aut:
             else:
                 historial = []
                 for i, c in enumerate(completados, 1):
-                    inicio = c["hora_inicio"].astimezone(zona_col)
-                    fin = c["hora_fin"].astimezone(zona_col)
+                    hora_inicio_local = c["hora_inicio"].astimezone(zona_col)
+                    hora_fin_local = c["hora_fin"].astimezone(zona_col)
                     historial.append({
                         "#": len(completados) - i + 1,
                         "Agente": c["agente_nombre"],
                         "Domain ID": c["agente_id"],
                         "Autorizador": c["autorizador_nombre"],
-                        "Fecha": inicio.strftime("%Y-%m-%d"),
-                        "Horario": f"{inicio.strftime('%H:%M:%S')} - {fin.strftime('%H:%M:%S')}",
+                        "Fecha": hora_inicio_local.strftime("%Y-%m-%d"),
+                        "Horario": f"{hora_inicio_local.strftime('%H:%M:%S')} - {hora_fin_local.strftime('%H:%M:%S')}",
                         "Duración": formatear_duracion(c["hora_fin"] - c["hora_inicio"])
                     })
-        
+                
                 df = pd.DataFrame(historial)
-                df.index = [""] * len(df)  # Oculta índice visual de pandas
+        
+                # === OCULTAR ÍNDICE DE PANDAS EN STREAMLIT ===
+                hide_table_row_index = """
+                    <style>
+                    thead tr th:first-child {display:none}
+                    tbody th {display:none}
+                    </style>
+                """
+                st.markdown(hide_table_row_index, unsafe_allow_html=True)
+        
                 st.dataframe(df, use_container_width=True)
