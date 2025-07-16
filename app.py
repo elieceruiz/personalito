@@ -178,11 +178,12 @@ if domain_aut:
                 st.info("No hay registros completados.")
             else:
                 historial = []
-                for i, c in enumerate(completados, 1):
+                total = len(completados)
+                for i, c in enumerate(completados):
                     hora_inicio_local = c["hora_inicio"].astimezone(zona_col)
                     hora_fin_local = c["hora_fin"].astimezone(zona_col)
                     historial.append({
-                        "#": len(completados) - i + 1,
+                        "#": total - i,
                         "Agente": c["agente_nombre"],
                         "Domain ID": c["agente_id"],
                         "Autorizador": c["autorizador_nombre"],
@@ -192,6 +193,13 @@ if domain_aut:
                     })
 
                 df = pd.DataFrame(historial)
-                df.index = ['' for _ in df.index]  # Oculta índice de pandas
+
+                # Ocultar índice duplicado
+                st.markdown("""
+                    <style>
+                    thead tr th:first-child {display:none}
+                    tbody th {display:none}
+                    </style>
+                """, unsafe_allow_html=True)
 
                 st.dataframe(df, use_container_width=True)
